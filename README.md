@@ -4,38 +4,6 @@
 
 This repository contains infrastructure-as-code, application code, and deployment configurations for a sample API application. It supports both local Kubernetes (Minikube) and cloud (AWS EKS) deployments, with CI/CD automation via GitHub Actions.
 
-
-## Architecture Diagram
-
-```
-## Deployment Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant GH as GitHub Actions
-    participant AWS as AWS Services
-    participant ECR as AWS ECR
-    participant EKS as AWS EKS
-    participant S3 as AWS S3
-    participant DDB as AWS DynamoDB
-
-    Dev->>GH: Push code to repository
-    GH->>AWS: Provision infrastructure (Terraform)
-    GH->>ECR: Build & push Docker image
-    GH->>EKS: Deploy app via Helm
-    EKS->>S3: App accesses S3 (if needed)
-    EKS->>DDB: App accesses DynamoDB (if needed)
-```
-
-
-Legend:
-- Local: Developer can run Minikube and test locally.
-- Cloud: GitHub Actions automates provisioning (Terraform), builds/pushes Docker images (ECR), and deploys to EKS (Helm).
-- EKS runs the API pods, which can use AWS services (S3, DynamoDB, etc.).
-```
-
-
 ## Folder Structure
 
 ```
