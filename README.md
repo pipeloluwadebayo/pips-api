@@ -8,39 +8,25 @@ This repository contains infrastructure-as-code, application code, and deploymen
 ## Architecture Diagram
 
 ```
-+-------------------+         +-------------------+
-|   Developer PC    |         |   GitHub Actions  |
-| (Local Dev/Test)  |         |   (CI/CD Runner)  |
-+--------+----------+         +--------+----------+
-         |                             |
-         | 1. Push code                | 2. Triggers workflow
-         +---------------------------->|
-                                       |
-                                       v
-                             +----------------------+
-                             |  AWS Infrastructure  |
-                             | (Provisioned by TF)  |
-                             +----------+-----------+
-                                        |
-                                        v
-+------------------- AWS Account (VPC, IAM, ECR, EKS, S3, DynamoDB) -------------------+
-|                                                                                      |
-|   +-------------------+         +-------------------+                                |
-|   |    AWS ECR        |<--------+  GitHub Actions   |                                |
-|   | (Docker Images)   |   (docker push)            |                                |
-|   +--------+----------+                            |                                |
-|            |                                       |                                |
-|            v                                       |                                |
-|   +-------------------+                            |                                |
-|   |   AWS EKS Cluster |<---------------------------+                                |
-|   +--------+----------+   (Helm deploy, kubectl)                                    |
-|            |                                                                       |
-|   +-------------------------------+                                                |                                          |
-|   |   +-----------------------+   |                                                |
-|   |   |  pips-api Deployment  |   |                                                |
-|   |   +-----------------------+   |                                                |                                             |
-|   +-------------------------------+                                                |
-+-------------------------------------------------------------------------------------+
+## Deployment Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub Actions
+    participant AWS as AWS Services
+    participant ECR as AWS ECR
+    participant EKS as AWS EKS
+    participant S3 as AWS S3
+    participant DDB as AWS DynamoDB
+
+    Dev->>GH: Push code to repository
+    GH->>AWS: Provision infrastructure (Terraform)
+    GH->>ECR: Build & push Docker image
+    GH->>EKS: Deploy app via Helm
+    EKS->>S3: App accesses S3 (if needed)
+    EKS->>DDB: App accesses DynamoDB (if needed)
+```
 
 
 Legend:
