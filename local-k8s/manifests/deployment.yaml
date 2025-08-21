@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pips-api
+  labels:
+    app: pips-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pips-api
+  template:
+    metadata:
+      labels:
+        app: pips-api
+    spec:
+      containers:
+        - name: flask-api
+          image: pipeloluwa/pips-api:latest
+          ports:
+            - containerPort: 5000

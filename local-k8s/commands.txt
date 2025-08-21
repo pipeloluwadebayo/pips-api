@@ -1,0 +1,5 @@
+minikube ip --profile=pips-api-cluster
+minikube start --profile=pips-api-cluster 
+kubectl get pods --namespace=test 
+kubectl port-forward svc/pips-api -n test 5000:5000
+

@@ -1,0 +1,181 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+ 
+  terraform-plan:
+    name: Terraform Init & Plan
+    strategy:
+      matrix:
+        environment: [dev, prod]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-role
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Terraform Init
+        run: terraform -chdir=infra/envs/${{ matrix.environment }} init
+
+      - name: Terraform Plan
+        run: terraform -chdir=infra/envs/${{ matrix.environment }} plan -out=tfplan
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: infra/envs/${{ matrix.environment }}/tfplan
+
+
+  # terraform auto-apply to dev
+  
+  terraform-apply-dev:
+    name: Terraform Apply Dev
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-role
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Download Dev Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-dev
+          path: infra/envs/dev/
+
+      - name: Terraform Init 
+        run: terraform -chdir=infra/envs/dev init
+
+      - name: Terraform Apply Dev (auto approve)
+        run: terraform -chdir=infra/envs/dev apply -auto-approve tfplan
+  
+
+ 
+  # Terraform manual apply to prod
+  
+  terraform-apply-prod:
+    name: Terraform Apply Prod
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    environment:
+      name: prod
+      url: https://my-prod-app.company.com  
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-role
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Download Prod Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-prod
+          path: infra/envs/prod/
+
+      - name: Terraform Init (Prod)
+        run: terraform -chdir=infra/envs/prod init
+
+      - name: Terraform Apply Prod (requires manual approval)
+        run: terraform -chdir=infra/envs/prod apply tfplan
+
+
+ 
+  # Helm deploy to dev
+  
+  helm-deploy-dev:
+    name: Helm Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: terraform-apply-dev
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up kubectl (Dev)
+        uses: azure/setup-kubectl@v3
+        with:
+          version: latest
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-role
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker image
+        run: docker build -t pips-api:latest ./apps/sample-api
+
+      - name: Tag and push Docker image
+        run: |
+          docker tag pips-api:latest <account_id>.dkr.ecr.us-east-1.amazonaws.com/pips-api:latest
+          docker push <account_id>.dkr.ecr.us-east-1.amazonaws.com/pips-api:latest
+
+      - name: Update kubeconfig for dev
+        run: aws eks update-kubeconfig --name myapp-dev --region us-east-1
+
+      - name: Helm Deploy to dev
+        run: |
+          helm upgrade --install pips-api ./deploy/helm/pips-api \
+            --namespace pips --create-namespace \
+            --values ./deploy/helm/pips-api/values-dev.yaml
+
+  # Helm deploy to prod
+  
+  helm-deploy-prod:
+    name: Helm Deploy to Prod
+    runs-on: ubuntu-latest
+    needs: terraform-apply-prod
+    environment: prod   
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up kubectl (Prod)
+        uses: azure/setup-kubectl@v3
+        with:
+          version: latest
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-role
+
+      - name: Update kubeconfig forprod
+        run: aws eks update-kubeconfig --name myapp-prod --region us-east-1
+
+      - name: Helm Deploy to Prod
+        run: |
+          helm upgrade --install pips-api ./deploy/helm/pips-api \
+            --namespace pips --create-namespace \
+            --values ./deploy/helm/pips-api/values-prod.yaml
