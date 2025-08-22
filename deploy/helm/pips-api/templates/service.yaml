@@ -1,15 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "pips-api.fullname" . }}
-  labels:
-    {{- include "pips-api.labels" . | nindent 4 }}
+  name: pips-api
 spec:
-  type: {{ .Values.service.type }}
-  ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
   selector:
-    {{- include "pips-api.selectorLabels" . | nindent 4 }}
+    app: pips-api
+    ports:
+    protocol: "TCP"
+    port: "80"
+    targetPort: "5000"
+    type: ClusterIP
